@@ -1,0 +1,8 @@
+{
+  "name": "Shopclip",
+  "short_name": "Shopclip",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f3eadc",
+  "theme_color": "#1e4d38"
+}
