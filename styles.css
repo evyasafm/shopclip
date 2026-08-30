@@ -457,6 +457,31 @@ a { color: inherit; }
 .field input::placeholder { color: var(--tertiary); }
 .field input:focus { outline: none; }
 
+.detected {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--label);
+  line-height: 1.2;
+}
+
+.detected span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  margin-bottom: 4px;
+}
+
+.detected.busy {
+  color: var(--secondary);
+  font-weight: 600;
+}
+
 /* Segmented glass control — one glass layer; selected thumb is solid */
 .chips {
   display: flex;

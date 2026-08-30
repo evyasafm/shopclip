@@ -62,17 +62,33 @@
     toast._t = setTimeout(() => el.classList.remove("on"), 1600);
   }
 
+  function setDetectedLabel(name, busy = false) {
+    const el = $("#detected-name");
+    if (el) {
+      el.classList.toggle("busy", !!busy);
+      const kicker = document.createElement("span");
+      kicker.textContent = "Detected";
+      el.replaceChildren(kicker, document.createTextNode(" " + (name || "Product")));
+    }
+    if (!busy) {
+      $$(".listing .nm").forEach((n) => (n.textContent = name || "Product"));
+    }
+  }
+
+  function isCatalogSrc(src) {
+    return typeof src === "string" && /(^|\/)items\/[^/?#]+\.jpe?g(\?|#|$)/i.test(src);
+  }
+
   function setProduct(p) {
     state.product = { ...p };
     $$(".hero-photo").forEach((img) => {
       img.src = p.src;
-      img.alt = p.name;
+      img.alt = p.name || "Product";
     });
-    const name = $("#name");
-    if (name && document.activeElement !== name) name.value = p.name || "";
-    $$(".listing .nm").forEach((n) => (n.textContent = p.name || "Listing"));
+    $$(".listing .nm").forEach((n) => (n.textContent = p.name || "Product"));
     const thumb = $("#gallery-thumb-img");
-    if (thumb) thumb.src = p.src;
+    if (thumb && isCatalogSrc(p.src)) thumb.src = p.src;
+    if (isCatalogSrc(p.src) && p.name) setDetectedLabel(p.name, false);
   }
 
   function renderLibrary() {
@@ -157,10 +173,10 @@
   }
 
   function finishGenerating() {
-    if (!state.clips.some((c) => c.src === state.product.src && c.name === (state.product.name || $("#name")?.value))) {
+    if (!state.clips.some((c) => c.src === state.product.src && c.name === state.product.name)) {
       const made = {
         ...state.product,
-        name: $("#name")?.value || state.product.name,
+        name: state.product.name,
         style: state.style,
         id: "clip-" + Date.now(),
       };
@@ -212,9 +228,8 @@
   }
 
   function applyRoute(name) {
-    const nameEl = $("#name");
-    if (nameEl && nameEl.value) state.product.name = nameEl.value;
     setProduct(state.product);
+    if (!detecting) setDetectedLabel(state.product.name || "Product", false);
     syncChips();
     syncQuota();
 
@@ -247,6 +262,137 @@
     }
   }
 
+  const DETECT_NAMES = {
+    cup: "Mug",
+    bottle: "Bottle",
+    "wine glass": "Glass",
+    handbag: "Bag",
+    backpack: "Bag",
+    suitcase: "Bag",
+    "cell phone": "Phone",
+    laptop: "Laptop",
+    keyboard: "Keyboard",
+    mouse: "Mouse",
+    remote: "Remote",
+    tv: "TV",
+    clock: "Clock",
+    vase: "Vase",
+    book: "Book",
+    scissors: "Scissors",
+    umbrella: "Umbrella",
+    tie: "Tie",
+    "teddy bear": "Toy",
+    "hair drier": "Hair dryer",
+    toothbrush: "Toothbrush",
+    bowl: "Bowl",
+    "potted plant": "Plant",
+    chair: "Chair",
+    couch: "Sofa",
+    bed: "Bed",
+    "dining table": "Table",
+    "sports ball": "Ball",
+    bicycle: "Bike",
+    skateboard: "Skateboard",
+    surfboard: "Surfboard",
+    "tennis racket": "Racket",
+    toaster: "Toaster",
+    microwave: "Microwave",
+    oven: "Oven",
+    refrigerator: "Fridge",
+    apple: "Apple",
+    banana: "Banana",
+    orange: "Orange",
+    cake: "Cake",
+    donut: "Donut",
+    sandwich: "Sandwich",
+    pizza: "Pizza",
+  };
+
+  let detecting = false;
+  let detectSeq = 0;
+  let cocoModel = null;
+  let cocoLoad = null;
+
+  function imageFromSrc(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("image"));
+      img.src = src;
+    });
+  }
+
+  function nameFromPredictions(preds) {
+    const ranked = (preds || [])
+      .filter((p) => p && p.class && p.class !== "person")
+      .sort((a, b) => (b.score || 0) - (a.score || 0));
+    const hit = ranked[0];
+    if (!hit) return "Product";
+    if (DETECT_NAMES[hit.class]) return DETECT_NAMES[hit.class];
+    return hit.class.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  async function detectFromPhoto(src) {
+    const seq = ++detectSeq;
+    detecting = true;
+    setDetectedLabel("Reading the product…", true);
+    try {
+      const model = await getCocoModel();
+      if (seq !== detectSeq) return;
+      const img = await imageFromSrc(src);
+      if (seq !== detectSeq) return;
+      const preds = await model.detect(img);
+      if (seq !== detectSeq) return;
+      const name = nameFromPredictions(preds);
+      state.product.name = name;
+      detecting = false;
+      setDetectedLabel(name, false);
+    } catch (err) {
+      if (seq !== detectSeq) return;
+      detecting = false;
+      state.product.name = "Product";
+      setDetectedLabel("Product", false);
+    }
+  }
+
+  function loadLib(id, src) {
+    return new Promise((resolve, reject) => {
+      if (id === "lib-coco" && window.cocoSsd) return resolve();
+      if (id === "lib-tfjs" && window.tf) return resolve();
+      const el = document.createElement("script");
+      el.src = src;
+      el.async = true;
+      el.onload = () => resolve();
+      el.onerror = () => reject(new Error("Failed to load " + src));
+      document.head.appendChild(el);
+    });
+  }
+
+  async function ensureTfAndCoco() {
+    if (window.cocoSsd) return;
+    const origin = "https://cdn.jsdelivr.net/npm/";
+    await loadLib("lib-tfjs", origin + "@tensorflow/tfjs@4.22.0/dist/tf.min.js");
+    await loadLib("lib-coco", origin + "@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js");
+  }
+
+  async function getCocoModel() {
+    if (cocoModel) return cocoModel;
+    if (!cocoLoad) {
+      cocoLoad = (async () => {
+        try {
+          await ensureTfAndCoco();
+          cocoModel = await window.cocoSsd.load({ base: "lite_mobilenet_v2" });
+          return cocoModel;
+        } catch (err) {
+          cocoLoad = null;
+          throw err;
+        }
+      })();
+    }
+    return cocoLoad;
+  }
+
   function onPickedFile(file) {
     if (!file) return;
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
@@ -254,16 +400,14 @@
     setProduct({
       id: "capture",
       src: state.objectUrl,
-      name: "New listing",
+      name: "Product",
     });
-    if ($("#name")) $("#name").value = "";
     state.from = "camera";
+    detectFromPhoto(state.objectUrl);
     go("confirm");
   }
 
   function makeClip() {
-    const n = $("#name");
-    if (n) state.product.name = n.value || state.product.name;
     if (state.usedFree && !state.subscribed) {
       go("paywall");
       return;
