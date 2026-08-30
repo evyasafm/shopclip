@@ -69,11 +69,8 @@
       img.alt = p.name;
     });
     const name = $("#name");
-    const price = $("#price");
     if (name && document.activeElement !== name) name.value = p.name || "";
-    if (price && document.activeElement !== price) price.value = p.price || "";
     $$(".listing .nm").forEach((n) => (n.textContent = p.name || "Listing"));
-    $$(".listing .pr").forEach((n) => (n.textContent = p.price || ""));
     const thumb = $("#gallery-thumb-img");
     if (thumb) thumb.src = p.src;
   }
@@ -164,7 +161,6 @@
       const made = {
         ...state.product,
         name: $("#name")?.value || state.product.name,
-        price: $("#price")?.value || state.product.price,
         style: state.style,
         id: "clip-" + Date.now(),
       };
@@ -217,9 +213,7 @@
 
   function applyRoute(name) {
     const nameEl = $("#name");
-    const priceEl = $("#price");
     if (nameEl && nameEl.value) state.product.name = nameEl.value;
-    if (priceEl && priceEl.value) state.product.price = priceEl.value;
     setProduct(state.product);
     syncChips();
     syncQuota();
@@ -261,19 +255,15 @@
       id: "capture",
       src: state.objectUrl,
       name: "New listing",
-      price: "",
     });
-    $("#name").value = "";
-    $("#price").value = "";
+    if ($("#name")) $("#name").value = "";
     state.from = "camera";
     go("confirm");
   }
 
   function makeClip() {
     const n = $("#name");
-    const p = $("#price");
-    state.product.name = n.value || state.product.name;
-    state.product.price = p.value || state.product.price;
+    if (n) state.product.name = n.value || state.product.name;
     if (state.usedFree && !state.subscribed) {
       go("paywall");
       return;
@@ -319,7 +309,7 @@
       b.addEventListener("click", async () => {
         const dest = b.dataset.dest;
         const title = state.product.name || "Shopclip";
-        const text = `${title} · ${state.product.price || ""} — listing clip from Shopclip`.trim();
+        const text = `${title} — listing clip from Shopclip`;
         if (dest === "save") {
           toast("Saved to Photos");
           return;
