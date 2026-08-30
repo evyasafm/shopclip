@@ -160,7 +160,7 @@
     const fill = $("#gen-fill");
     if (fill) fill.style.width = "0%";
     const t0 = performance.now();
-    const dur = 4000;
+    const dur = 550;
     cancelAnimationFrame(genRaf);
     const tick = (now) => {
       if (currentRoute() !== "generating") return;
@@ -403,7 +403,7 @@
       name: "Product",
     });
     state.from = "camera";
-    detectFromPhoto(state.objectUrl);
+    /* vision deferred: too slow on the critical path */
     go("confirm");
   }
 
@@ -412,7 +412,7 @@
       go("paywall");
       return;
     }
-    go("generating");
+    finishGenerating();
   }
 
   function bind() {
@@ -440,7 +440,7 @@
       state.subscribed = true;
       persist();
       syncQuota();
-      go("generating");
+      finishGenerating();
     });
     $("#pay-restore").addEventListener("click", () => {
       toast("No purchases to restore");
